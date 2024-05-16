@@ -26,7 +26,6 @@ fn build_priority_map() -> HashMap<TokenType, u8> {
     priority_map.insert(TokenType::Number, 1);
     priority_map.insert(TokenType::Symbol, 2);
     priority_map.insert(TokenType::Operator, 1);
-    priority_map.insert(TokenType::Type, 2);
     priority_map.insert(TokenType::Keyword, 3);
     priority_map
 }
@@ -35,33 +34,25 @@ fn build_priority_map() -> HashMap<TokenType, u8> {
 fn build_identity_map() -> HashMap<fn(char)->bool, Vec<TokenType>> {
     let mut res = HashMap::<fn(char)->bool, Vec<TokenType>>::new();
     res.insert(is_number, vec!(TokenType::Number));
-    res.insert(is_letter, vec!(TokenType::Ident, TokenType::Type, TokenType::Keyword));
+    res.insert(is_letter, vec!(TokenType::Ident, TokenType::Keyword));
     res.insert(is_sign, vec!(TokenType::Symbol, TokenType::Operator));
     res.insert(is_operator, vec!(TokenType::Operator, TokenType::Symbol));
     res
 }
 
-fn compute_next_query(chars: &mut Peekable<Chars>) -> Result<String, String> {
-    let mut query = String::new();
-    let mut last = ';';
-    let mut comma = false;
+fn compute_next_line(chars: &mut Peekable<Chars>) -> String {
+    let mut line = String::new();
+    let mut last = '\n';
     while let Some(c) = chars.next() {
-        last = c;
-        query.push(c);
-        if c == ';' && !comma {
+        if c == '\n' && !"\\\n".contains(last) {
             break;
+        } else if c != '\n' {
+            line.push(c);
         }
-        if c == '\'' {
-            comma = !comma;
-        }
+        last = c;
     }
-    query = query.trim().to_string();
-    if last != ';' && !query.is_empty() {
-        eprintln!("ERROR: You forgot a comma");
-        Err(query)
-    } else {
-        Ok(query)
-    }
+    line = line.trim().to_string();
+    line
 }
 
 impl<'a> Tokenizer {
@@ -79,23 +70,14 @@ impl<'a> Tokenizer {
         let mut file = File::open(&path).expect(&format!("File {} doesn't exists", path));
         let mut file_content = String::new();
         file.read_to_string(&mut file_content).unwrap();
-        match self.precompile(file_content, &path) {
-            Ok(s) => {
-                let mut chars = s.chars().peekable();
-                while chars.peek().is_some() {
-                    let query = compute_next_query(&mut chars);
-                    if query.is_err() || self.tokenize_one_query(query.unwrap()).is_err() {
-                        break;
-                    }
-                }
+        let mut chars = file_content.chars().peekable();
+        while chars.peek().is_some() {
+            let line = compute_next_line(&mut chars);
+            println!("{line}");
+            if line.is_empty() || self.tokenize_one_line(line).is_err() {
+                break;
             }
-            Err(e) => push_token(&self, TokenType::ERROR, &e, Flag::NoFlag)
         }
-        self.end()
-    }
-
-    pub fn tokenize_query(mut self, query: String) {
-        let _ = self.tokenize_one_query(query);
         self.end()
     }
 
@@ -104,9 +86,9 @@ impl<'a> Tokenizer {
         sender.send(TokenizerMessage::Tokenizer(self)).expect("Failed to send the tokenizer to main thread")
     }
     
-    fn tokenize_one_query(&mut self, query: String) -> Result<(), ()>{
-        let first_node = self.group_map.get(&TokenType::Request).unwrap();
-        let mut chars = query.chars().peekable();
+    fn tokenize_one_line(&mut self, line: String) -> Result<(), ()>{
+        let first_node = self.group_map.get(&TokenType::Line).unwrap();
+        let mut chars = line.chars().peekable();
         self.skip_garbage(&mut chars);
         while chars.peek().is_some() {
             if self.travel(first_node, &mut chars).is_err() {
@@ -287,38 +269,6 @@ impl<'a> Tokenizer {
                 chars.next();
             }
         }
-    }
-
-    fn precompile(&self, input: String, current_file_path: &str) -> Result<String, String> {
-        let mut vec: Vec<String> = input.split("$").map(String::from).collect();
-        let mut annalyse_next = true;
-        let mut iter = vec.iter_mut();
-        iter.next();
-        while let Some(s) = iter.next() {
-            if annalyse_next {
-                let mut chars = s.chars();
-                let mut current_line = String::new();
-                while let Some(c) = chars.next() {
-                    if c == '\n' {
-                        break;
-                    }
-                    current_line.push(c);
-                }
-                *s = self.new_precompile_macro(current_line, &current_file_path)? + &chars.collect::<String>();
-            }else{
-                *s = String::from("$") + s;
-            }
-            annalyse_next = !s.ends_with("\\");
-        }
-        Ok(vec.join(""))
-    }
-
-    fn new_precompile_macro(&self, m: String, _current_file_path: &str) -> Result<String, String> {
-        let split: Vec<&str> = m.split_whitespace().collect();
-        match &split[0] as &str {
-            _ => Err(format!("Unknow token: {}", split[0]))
-        }
-
     }
 
 }

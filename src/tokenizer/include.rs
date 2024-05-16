@@ -11,43 +11,28 @@ pub enum TokenType {
     // Primitive Token
     Ident,  
     Number,
-    Type,
     Symbol,
-    Character,  // The difference between a symbol and a character is the symbol ignore garbage, the char not.
     Operator,
     Keyword,
     
     // Group Token
-    Request,
-    CreateReq,
-    ResetReq,
-    InsertReq,
-    SelectReq,
-    UpdateReq,
-    FromWhereReq,
-    DeleteReq,
-    DropReq,
-    
-    Affectation,
-    SerieAffectation,
+    Line,
+
+    SerieArg,
+    Arg,
+
+    InKeyword,
+    Macro,
+    Section,
     
     Expression,
-    ExpressionTupple,
-    SerieExpression,
     Value,
-    IdentTupple,
     SerieIdent,
-
+    SerieString,
     String,
     SerieChar,
     ComplexChar,
     
-    Declaration,
-    PrimaryKey,
-    DefaultValue,
-    
-    DeclarationTuple,
-    SerieDeclaration,
     
     End,
     BackLine,
@@ -62,14 +47,13 @@ pub enum Flag {
     NoFlag
 }
 
-
-pub static TYPE_LIST: &[&'static str; 3] = &["BOOL", "INT", "STRING"];
-pub static OPERATORS: &[&'static str; 13] = &["+", "-", "*", "/", "%", "<", ">", "<=", ">=", "==", "!=", "||", "&&"];
-pub static AFFECT_OPERATOR: &[&'static str; 1] = &["="];
-static KEYWORD: &[&'static str; 13] = &["RESET", "CREATE", "TABLE", "INTO", "DROP", "VALUES", "SELECT", "PRIMARY", "KEY", "FROM", "WHERE", "UPDATE", "SET"];
-pub static OPERATOR_COMPONENT: &[char; 9] = &['+', '%', '/', '<', '>', '=', '|', '&', '!'];
-pub static DEFAULT_GARBAGE_CHARACTER: &[char; 3] = &[' ', '\n', '\t'];
-static PRIMITIVE_TOKENTYPE: &[TokenType; 6] = &[TokenType::Ident, TokenType::Type, TokenType::Symbol, TokenType::Number, TokenType::Operator, TokenType::Keyword];
+pub static KEYWORDS: &[&'static str; 5] = &["GROUPS", "TPRIM", "SYMB", "in", "END"];
+pub static SECTIONS: &[&'static str; 4] = &["DEFINE", "CHAR_RULES", "TPRIM_RULES", "GROUP_RULES"];
+pub static MACROS: &[&'static str; 3] = &["DIGITS", "LETTERS", "OTHER"];
+pub static OPERATORS: &[&'static str; 2] = &["||", "&&"];
+pub static OPERATOR_COMPONENT: &[char; 2] = &['|', '&'];
+pub static DEFAULT_GARBAGE_CHARACTER: &[char; 2] = &[' ', '\t'];
+static PRIMITIVE_TOKENTYPE: &[TokenType; 5] = &[TokenType::Ident, TokenType::Symbol, TokenType::Number, TokenType::Operator, TokenType::Keyword];
 pub static FAIL_MESSAGE: &str = "Syntax error";
 
 pub enum TokenizerMessage {
@@ -161,9 +145,8 @@ impl PartialEq for Node {
 
 fn get_default_constraint(token_type: TokenType ) -> Vec<&'static str> {
     match token_type {
-        TokenType::Type => Vec::from(TYPE_LIST),
         TokenType::Operator => Vec::from(OPERATORS),
-        TokenType::Keyword => Vec::from(KEYWORD),
+        TokenType::Keyword => Vec::from(KEYWORDS),
         _ => Vec::new()
     }
 }
