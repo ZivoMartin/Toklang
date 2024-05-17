@@ -2,7 +2,7 @@ use super::include::*;
 
 use super::sections::{
     define_section::DefineSection,
-    symb_section::SymbSection,
+    symbol_rules_section::SymbolRulesSection,
     tprim_rules_section::TPrimRulesSection,
     group_rules_section::GroupRulesSection,
 };
@@ -44,7 +44,7 @@ impl<'a> Interpreteur<'a> {
     fn build_section_map() -> HashMap<&'static str, Box<dyn Section>> {
         let mut res = HashMap::new();
         res.insert("DEFINE", DefineSection::new());
-        res.insert("CHAR_RULES", SymbSection::new());
+        res.insert("CHAR_RULES", SymbolRulesSection::new());
         res.insert("TPRIM_RULES", TPrimRulesSection::new());
         res.insert("GROUP_RULES", GroupRulesSection::new());
         res
