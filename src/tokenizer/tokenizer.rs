@@ -8,7 +8,7 @@ use std::str::Chars;
 use std::io::prelude::*;
 use std::sync::mpsc::Sender;
 
-static COM_CHAR: char = '#';
+static COM_CHAR: char = '~';
 
 pub struct Tokenizer {
     sender: Sender<TokenizerMessage>,                          // The thread asking the tokenization
@@ -73,7 +73,6 @@ impl<'a> Tokenizer {
         let mut chars = file_content.chars().peekable();
         while chars.peek().is_some() {
             let line = compute_next_line(&mut chars);
-            println!("{line}");
             if line.is_empty() || self.tokenize_one_line(line).is_err() {
                 break;
             }
@@ -110,6 +109,7 @@ impl<'a> Tokenizer {
                 if chars.peek().is_some() {
                     let mut paths_vec = self.get_son_array(current_node);
                     let save = chars.clone();
+
                     match self.get_next_token(&mut paths_vec, chars) {
                         Ok(token_string) => {
                             match self.filter_nodes(&mut paths_vec, &token_string) {
@@ -171,7 +171,7 @@ impl<'a> Tokenizer {
                             self.next_char_while(&mut current_token, chars, |c: char| {is_letter(c) || is_number(c)});
                     }
                     return Ok(current_token)
-                }else{
+                } else {
                     return Err(format!("FAILED TO TOKENIZE"))
                 }
             }

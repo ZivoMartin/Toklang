@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use super::include::{Node, TokenType, Flag, MACROS, SECTIONS};
+use super::include::{Node, TokenType, MACROS, SECTIONS, Flag};
 use super::tokenizer::push_token;
 
 pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
@@ -8,12 +8,13 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
         TokenType::Line,
         Node::new(
             TokenType::Line,
-            vec!(),
+            vec!(
+                Node::leaf(TokenType::Section),
+            ),
             vec!(
                 Node::new(
                     TokenType::Ident,
                     vec!(
-                        Node::leaf(TokenType::Section),
                         Node::leaf(TokenType::InKeyword)
                     ),
                     vec!(
@@ -90,7 +91,7 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                     TokenType::Symbol,
                     vec!(),
                     vec!(
-                        Node::leaf_c(TokenType::Ident, Vec::from(SECTIONS))
+                        Node::leaf_c(TokenType::Ident, Vec::from(SECTIONS)).set_flag(Flag::Section).react(push_token)
                     ),
                     vec!("#")
                 )

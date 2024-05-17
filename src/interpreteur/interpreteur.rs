@@ -1,29 +1,56 @@
 use super::include::*;
 
-pub struct Interpreteur {
-//     request_treaters: Vec<Box<dyn Request>>,
-//     keyword_link: HashMap<String, usize>,
-//     current_treater: usize,
-//     database: Database,
-//     request_in_treatment: bool
+use super::sections::{
+    define_section::DefineSection,
+    symb_section::SymbSection,
+    tprim_rules_section::TPrimRulesSection,
+    group_rules_section::GroupRulesSection,
+};
+
+pub struct Interpreteur<'a> {
+    text: &'a str,
+    symb_types: HashMap<&'a str, &'a str>,
+    current_section: &'a str,
+    sections: HashMap<&'a str, Box<dyn Section>>
 }
 
-impl Interpreteur {
+impl<'a> Interpreteur<'a> {
 
-    pub fn new() -> Interpreteur{
+    pub fn new<'b>(text: &'b str) -> Interpreteur<'b> {
         Interpreteur {
-            // request_treaters: Interpreteur::build_treaters(),
-            // keyword_link: Interpreteur::build_keyword_link(),
-            // current_treater: 0,
-            // database: Database::load(),
-            // request_in_treatment: false
+            text,
+            current_section: "",
+            sections: Interpreteur::build_section_map(),
+            symb_types: HashMap::new(),
         }
     }
 
-    pub fn new_token(&mut self, _token: Token) -> ConsumeResult {
+    pub fn new_token(&mut self, token: Token) -> ConsumeResult {
+        match token.token_type {
+            TokenType::Ident => self.new_ident(token),
+            _ => panic!("Unexpected token: {:?}", token.token_type)
+        }
         Ok(())
     }
 
+    
+    fn new_ident(&mut self, token: Token) {
+        match token.flag {
+            Flag::Section => println!("new section: {}", token.content),
+            _ => todo!("New ident for current section")
+        }
+    }
+
+    fn build_section_map() -> HashMap<&'static str, Box<dyn Section>> {
+        let mut res = HashMap::new();
+        res.insert("DEFINE", DefineSection::new());
+        res.insert("CHAR_RULES", SymbSection::new());
+        res.insert("TPRIM_RULES", TPrimRulesSection::new());
+        res.insert("GROUP_RULES", GroupRulesSection::new());
+        res
+    }
+
+    
     // fn consume_token(&mut self, token: Token) -> ConsumeResult {
     //     if self.request_in_treatment {
     //         self.request_treaters[self.current_treater].consume(&mut self.database, token)?;

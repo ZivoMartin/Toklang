@@ -4,7 +4,6 @@ use super::tokenizer::end_request;
 
 
 #[allow(dead_code)]
-
 #[allow(dead_code)]
 #[derive(Eq, Hash, PartialEq, Debug)]
 pub enum TokenType {
@@ -43,7 +42,7 @@ pub enum TokenType {
 #[derive(Debug)]
 #[derive(PartialEq)]
 pub enum Flag {
-    Comma,
+    Section,
     NoFlag
 }
 
@@ -151,6 +150,7 @@ fn get_default_constraint(token_type: TokenType ) -> Vec<&'static str> {
     }
 }
 
+#[allow(dead_code)]
 impl Node {
 
     fn check_son(self) -> Node{

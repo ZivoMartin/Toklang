@@ -1,60 +1,80 @@
 pub use crate::tokenizer::include::{Token, TokenType, Flag};
-pub use std::process::exit;
-pub use super::string_builder::StringBuilder;
-pub use std::collections::HashMap;
 pub type ConsumeResult = Result<(), String>;
-pub use super::stack::Stack;
+pub use std::collections::HashMap;
 pub use std::str::Chars;
 pub use std::iter::Peekable;
 
-use std::path::{
-    Path,
-};
 
-type TypeChar = usize;
-type Forest = Vec::<Node>;
+pub trait Section {
 
-
-pub enum Node {
-    Node(TypeChar, bool, Forest),
-    Leaf(TypeChar)
+    fn new() -> Box::<dyn Section> where Self: Sized;
+    
+    fn new_token(&mut self, token: Token);
+    
 }
 
 
-pub fn ptoken_building_tree(mut expr: &mut Peekable<Chars>) -> Forest {
+type TypeChar<'a> = &'a str;
+type Forest<'a> = Vec::<Node<'a>>;
+
+#[derive(Debug)]
+pub enum Node<'a> {
+    Node(TypeChar<'a>, bool, Forest<'a>),
+    Leaf(TypeChar<'a>)
+}
+
+pub fn get_code(root: &str) -> &'static str {    
+    "test"
+}
+
+pub fn ptoken_building_tree(mut expr: &str) -> Forest {
+    expr = expr.trim();
+    let mut iter = expr.chars().peekable();
     let mut forest = Forest::new();
-    setup_expr(&mut expr);
-    while expr.peek().is_some() {
-        let sub_exp = get_next_expr(&mut expr, '|').chars();
-        let sub_exp = sub_exp.peekable();
-        setup_expr(&mut sub_exp);
+    while iter.peek().is_some() {
+        let sub_expr: &str;
+        (sub_expr, expr) = get_next_expr(expr, &mut iter, '|');
+        let (root, mut rest) = get_next_expr(sub_expr, &mut sub_expr.chars().peekable(), '&');
+        rest = rest.trim();
+        if rest.is_empty() {
+            forest.push(Node::Leaf(get_code(root)))
+        } else {
+            forest.push(Node::Node(get_code(root), false, ptoken_building_tree(rest)));
+        }
     }
     forest
 }
 
-fn setup_expr(expr: &mut Peekable<Chars>)  {
-    if expr.peek() == Some(&'(') {
-        let _ = expr.next();
-    }
-}
-
-fn get_next_expr(expr: &mut impl Iterator<Item = char>, stop_char: char) -> String {
-    let mut res = String::new();
+fn get_next_expr<'a>(mut expr: &'a str, iter: &mut Peekable<Chars<'a>>, stop_char: char) -> (&'a str, &'a str) {
+    let mut res = 0;
     let mut comma = false;
     let mut par_count = 0;
-    while let Some(c) = expr.next() {
+    let first = *iter.peek().expect("expr empty");
+    let mut c = first;
+    while let Some(new_char) = iter.next() {
+        c = new_char;
         match c {
             '(' => par_count += 1,
             ')' => par_count -= 1,
             '\"' => comma = !comma,
             _ => {
                 if c == stop_char && !comma && par_count == 0 {
-                    let _ = expr.next();
-                    return res;
+                    let _ = iter.next();
+                    return (&expr[0..(res-1)].trim(), &expr[(res+2)..expr.len()]);
                 }
             }
         }
-        res.push(c);
+        if par_count == -1 {
+            par_count = 0;
+        }
+        res += 1;
     }
-    res
+    // res = res.trim().to_string();    
+    if first == '(' && c == ')' {
+        expr = &expr[1..(res-1)];
+        *iter = expr.chars().peekable();
+        get_next_expr(expr, iter, stop_char)
+    } else {
+        (&expr[0..res].trim(), &expr[res..expr.len()])
+    }
 }
