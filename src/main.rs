@@ -34,7 +34,7 @@ pub fn begin(path: &str) {
     let tokenizer = Tokenizer::new(sender);
     let moved_path = path.to_string();
     spawn(move ||
-          tokenizer.tokenize_file(moved_path)
+          tokenizer.tokenize_file(&content)
     );
     match execute(&mut interp, &receiver) {
         Ok(_tokenizer) => println!("The execution of the file {} has been a success.", path),
@@ -43,18 +43,17 @@ pub fn begin(path: &str) {
 }
 
 
-fn execute(interp: &mut Interpreteur, receiver: &Receiver<TokenizerMessage>) -> Result<Tokenizer, String> {
-    let mut tokenizer: Option<Tokenizer> = None;
-    while tokenizer.is_none() {
+fn execute<'a>(interp: &mut Interpreteur, receiver: &Receiver<TokenizerMessage<'a>>) -> Result<(), String> {
+    loop  {
         match receiver.recv().expect("Something went wrong") {
             TokenizerMessage::Token(token) =>
                 if token.token_type == TokenType::ERROR {
-                    return Err(token.content)
+                    return Err(token.content.to_string())
                 } else if let Err(e) = interp.new_token(token) {
                     return Err(e)
                 }
-            TokenizerMessage::Tokenizer(the_tokenizer) => tokenizer = Some(the_tokenizer)
+            TokenizerMessage::End() => break
         }
     }
-    Ok(tokenizer.take().expect("Failed to catch the tokenizer throught the threads."))
+    Ok(())
 }

@@ -55,29 +55,29 @@ pub static DEFAULT_GARBAGE_CHARACTER: &[char; 2] = &[' ', '\t'];
 static PRIMITIVE_TOKENTYPE: &[TokenType; 5] = &[TokenType::Ident, TokenType::Symbol, TokenType::Number, TokenType::Operator, TokenType::Keyword];
 pub static FAIL_MESSAGE: &str = "Syntax error";
 
-pub enum TokenizerMessage {
+pub enum TokenizerMessage<'a> {
 
-    Token(Token),
-    Tokenizer(Tokenizer)
+    Token(Token<'a>),
+    End()
     
 }
 
 
 #[derive(Debug)]
-pub struct Token {
+pub struct Token<'a> {
     pub token_type: TokenType,
-    pub content: String,
+    pub content: &'a str,
     pub flag: Flag 
 }
 
-impl Token {
-    pub fn new(token_type: TokenType, content: String, flag: Flag) -> Token {
-        Token{token_type, content, flag}
+impl<'a> Token<'a> {
+    pub fn new(token_type: TokenType, content: &'a str, flag: Flag) -> Token<'a> {
+        Token::<'a>{token_type, content, flag}
     }
 
     #[allow(dead_code)]
-    pub fn empty(token_type: TokenType) -> Token {
-        Token::new(token_type, String::new(), Flag::NoFlag)
+    pub fn empty(token_type: TokenType) -> Token<'a> {
+        Token::<'a>::new(token_type, "", Flag::NoFlag)
     }
     
 }
@@ -113,7 +113,7 @@ impl<'a> Path<'a> {
         self.path[0]
     }
 
-    pub fn proke_travel_functions(&self, tokenizer: &Tokenizer, token_string: &String) {
+    pub fn proke_travel_functions(&self, tokenizer: &Tokenizer<'a>, token_string: &str) {
         for node in self.path.iter().rev() {
             if node.travel_react.is_some() {
                 (node.travel_react.unwrap())(tokenizer, node.type_token, token_string, node.flag)
@@ -132,7 +132,7 @@ pub struct Node {
     pub constraints: (Vec::<&'static str>, bool),
     pub consider_garbage: bool,
     pub retry: i8,
-    pub travel_react: Option::<fn(&Tokenizer, TokenType, &String, Flag)>
+    pub travel_react: Option::<fn(&Tokenizer, TokenType, &str, Flag)>
 }
 
 
@@ -235,7 +235,7 @@ impl Node {
         self.constraints.0.is_empty() || contains && self.constraints.1 || !contains && !self.constraints.1
     }
 
-    pub fn react(mut self, r: fn(&Tokenizer, TokenType, &String, Flag)) -> Node {
+    pub fn react(mut self, r: fn(&Tokenizer, TokenType, &str, Flag)) -> Node {
         self.travel_react = Some(r);
         self
     }
