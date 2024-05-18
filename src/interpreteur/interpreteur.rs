@@ -1,83 +1,78 @@
 use super::include::*;
 
-use super::sections::{
-    define_section::DefineSection,
-    symbol_rules_section::SymbolRulesSection,
-    tprim_rules_section::TPrimRulesSection,
-    group_rules_section::GroupRulesSection,
-};
+pub struct Maps<'a> {
+    symb_types: HashMap<&'a str, &'a str>
+}
+
+impl<'a> Maps<'a> {
+    fn new() -> Maps<'a> {
+        Maps{
+            symb_types: HashMap::new()
+        }
+    }
+}
 
 pub struct Interpreteur<'a> {
     text: &'a str,
-    symb_types: HashMap<&'a str, &'a str>,
+    maps: Maps<'a>,
     current_section: &'a str,
-    sections: HashMap<&'a str, Box<dyn Section>>
+    sections: HashMap<&'a str, fn(&mut Interpreteur<'a>, Token)>
 }
 
 impl<'a> Interpreteur<'a> {
 
-    pub fn new<'b>(text: &'b str) -> Interpreteur<'b> {
+    pub fn new(text: &str) -> Interpreteur<'_> {
         Interpreteur {
             text,
+            maps: Maps::new(),
             current_section: "",
             sections: Interpreteur::build_section_map(),
-            symb_types: HashMap::new(),
         }
     }
 
     pub fn new_token(&mut self, token: Token) -> ConsumeResult {
         match token.token_type {
             TokenType::Ident => self.new_ident(token),
-            _ => panic!("Unexpected token: {:?}", token.token_type)
+            _ => self.consume_token(token)
         }
         Ok(())
     }
 
     
     fn new_ident(&mut self, token: Token) {
+        let (i, j) = token.content;
         match token.flag {
-            Flag::Section => println!("new section: {}", token.content),
-            _ => todo!("New ident for current section")
+            Flag::Section => self.current_section = &self.text[i..j],
+            _ => self.consume_token(token)
         }
     }
 
-    fn build_section_map() -> HashMap<&'static str, Box<dyn Section>> {
-        let mut res = HashMap::new();
-        res.insert("DEFINE", DefineSection::new());
-        res.insert("CHAR_RULES", SymbolRulesSection::new());
-        res.insert("TPRIM_RULES", TPrimRulesSection::new());
-        res.insert("GROUP_RULES", GroupRulesSection::new());
+    fn define_token(&mut self, token: Token) {
+        
+    }
+
+    fn tprim_rules_token(&mut self, token: Token) {}
+    
+    fn group_rules_token(&mut self, token: Token) {}
+    
+    fn symb_rules_token(&mut self, token: Token) {}
+    
+    
+    fn build_section_map() -> HashMap<&'a str, fn(&mut Interpreteur<'a>, Token)> {
+        let mut res = HashMap::<&'a str, fn(&mut Interpreteur<'a>, Token)>::new();
+        res.insert("DEFINE", Interpreteur::define_token);
+        res.insert("CHAR_RULES",  Interpreteur::symb_rules_token);
+        res.insert("TPRIM_RULES", Interpreteur::tprim_rules_token);
+        res.insert("GROUP_RULES", Interpreteur::group_rules_token);
         res
     }
 
-    
-    // fn consume_token(&mut self, token: Token) -> ConsumeResult {
-    //     if self.request_in_treatment {
-    //         self.request_treaters[self.current_treater].consume(&mut self.database, token)?;
-    //     } else {
-    //         self.current_treater = *self.keyword_link.get(&token.content).expect(&format!("Interpreteur: Unknow main keyword: {}", token.content));
-    //         self.request_in_treatment = true;
-    //     }
-    //     Ok(())
-    // }
-    
-    // fn end_request(&mut self) -> ConsumeResult {
-    //     self.request_treaters[self.current_treater].end(&mut self.database)?;
-    //     self.request_in_treatment = false;
-    //     Ok(())
-    // }
-    
-    // fn build_treaters() -> Vec<Box<dyn Request>> {
-    //     vec!(CreateReq::new(), DropReq::new(), ResetReq::new(), InsertReq::new(), SelectReq::new(), SetReq::new(), DeleteReq::new())
-    // }
 
-    // fn build_keyword_link() -> HashMap::<String, usize> {
-    //     let mut res = HashMap::<String, usize>::new();
-    //     for (i, kw) in Vec::from(["CREATE", "DROP", "RESET", "INSERT", "SELECT", "SET", "DELETE"]).iter().enumerate() {
-    //         res.insert(String::from(*kw), i);
-    //     }
-    //     res
-    // }
+    fn consume_token(&mut self, token: Token) {
+        let token_meth = *self.sections.get(self.current_section).expect(&format!("The section {} doesn't exist", self.current_section));
+        token_meth(self, token);
+    }
+   
     
 }
 

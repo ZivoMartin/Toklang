@@ -4,15 +4,14 @@ use crate::interpreteur::stack::Stack;
 use super::include::*;
 use super::grammar_tree::build_grammar_tree;
 use std::iter::Peekable;
-use std::fs::File;
 use std::str::Chars;
-use std::io::prelude::*;
 use std::sync::mpsc::Sender;
 
 static COM_CHAR: char = '~';
 
-pub struct Tokenizer<'a> {
-    sender: Sender<TokenizerMessage<'a>>,                      // The thread asking the tokenization
+pub struct Tokenizer {
+    text: String,
+    sender: Sender<TokenizerMessage>,                           // The thread asking the tokenization
     group_map: HashMap<TokenType, Node>,                       // Associate a token group to his node in the grammar tree
     priority_map: HashMap<TokenType, u8>,                      // Associate a primotive tokentype to his prority (keyword has a greater priority than an identificator)
     identity_map: HashMap<fn(char)->bool, Vec<TokenType>>      // Associate a function who recognize the signification of a char to the possible token type which could be built by this char 
@@ -44,6 +43,7 @@ fn build_identity_map() -> HashMap<fn(char)->bool, Vec<TokenType>> {
 struct TextTraveler<'a> {
     save_stack: Stack<usize>,
     mark: usize,
+    base_i: usize,
     i: usize,
     chars: Peekable<Chars<'a>>,
     text: &'a str
@@ -51,10 +51,11 @@ struct TextTraveler<'a> {
 
 impl<'a> TextTraveler<'a> {
 
-    fn new(text: &'a str) -> TextTraveler<'a> {
+    fn new(text: &'a str, base_i: usize) -> TextTraveler<'a> {
         TextTraveler {
             save_stack: Stack::new(),
             mark: 0,
+            base_i,
             i: 0,
             chars: text.chars().peekable(),
             text
@@ -68,6 +69,10 @@ impl<'a> TextTraveler<'a> {
     fn get(&self) -> &'a str {
         &self.text[self.mark..self.i]
     }
+
+    fn get_msg(&self) -> ContentType {
+        (self.mark+self.base_i, self.i+self.base_i)
+    } 
     
     fn save(&mut self) {
         self.save_stack.push(self.i);
@@ -79,37 +84,49 @@ impl<'a> TextTraveler<'a> {
     }
 
     fn next(&mut self) -> Option<char> {
-        self.i += 1;
+        self.i += (self.i < self.text.len()) as usize;
         self.chars.next()
     }
 
-    fn peek(&mut self) -> Option<&char> {
-        self.chars.peek()
+    fn peek(&mut self) -> Option<char> {
+        match self.chars.peek() {
+            Some(c) => Some(*c),
+            None => None
+        }
     }
 
-    fn compute_next_line(&mut self) -> &'a str {
-        let save = self.i;
+    fn compute_next_line(&mut self) -> Option<(&str, usize)> {
+        while let Some(c) = self.peek() {
+            if !"\\\n \t".contains(c) {
+                break;
+            }
+            self.next();
+        }
+        if self.peek() == None {
+            return None;
+        }
+        self.mark();
         let mut last = '\n';
         while let Some(c) = self.next() {
             if c == '\n' && !"\\\n".contains(last) {
                 break;
-            } else if c != '\n' {
-                self.i += 1;
             }
             last = c;
         }
-        &self.text[save..self.i].trim()
+        Some((self.get().trim_end(), self.mark))
     }
 
-    fn current_char(&self) -> &'a str {
-        &self.text[self.i..self.i]
+    fn str_next(&mut self) -> &'a str {
+        self.next();
+        &self.text[self.i-1..self.i]
     }
 }
 
-impl<'a> Tokenizer<'a> {
+impl<'a> Tokenizer {
 
-    pub fn new(sender: Sender<TokenizerMessage<'a>>) -> Tokenizer {
+    pub fn new(text: String, sender: Sender<TokenizerMessage>) -> Tokenizer {
         Tokenizer{
+            text,
             sender,
             group_map: build_grammar_tree(),
             priority_map: build_priority_map(),
@@ -117,15 +134,14 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    pub fn tokenize_file(mut self, txt: &'a str) {
-        let mut chars = TextTraveler::<'a>::new(txt);
-        while chars.peek().is_some() {
-            let line = chars.compute_next_line();
-            if line.is_empty() || self.tokenize_one_line(line).is_err() {
+    pub fn tokenize_file(&'a self) {
+        let mut chars = TextTraveler::<'a>::new(&self.text, 0);
+        while let Some((line, base_i)) = chars.compute_next_line() {
+            if self.tokenize_one_line(line, base_i).is_err() {
                 break;
             }
         }
-        self.end()
+        self.end();
     }
 
     fn end(&self) {
@@ -133,21 +149,21 @@ impl<'a> Tokenizer<'a> {
         sender.send(TokenizerMessage::End()).expect("Failed to send the tokenizer to main thread")
     }
     
-    fn tokenize_one_line(&'a self, line: &'a str) -> Result<(), ()>{
+    fn tokenize_one_line(&'a self, line: &'a str, base_i: usize) -> Result<(), ()>{
         let first_node = self.group_map.get(&TokenType::Line).unwrap();
-        let mut chars = TextTraveler::<'a>::new(line);
+        let mut chars = TextTraveler::<'a>::new(line, base_i);
         self.skip_garbage(&mut chars);
         while chars.peek().is_some() {
             if self.travel(first_node, &mut chars).is_err() {
-                push_token(self, TokenType::ERROR, FAIL_MESSAGE, Flag::NoFlag);
+                push_token(self, TokenType::ERROR, EMPTY_TOKEN, Flag::NoFlag);
                 return Err(());
             }
-            self.skip_garbage(&mut chars); 
+            self.skip_garbage(&mut chars);
         }   
         Ok(())
     }
     
-    fn travel(&'a self, current_node: &'a Node, chars: &mut TextTraveler<'a>) -> Result<(), i8> {
+    fn travel(&'a self, current_node: &'a Node, chars: &mut TextTraveler) -> Result<(), i8> {
         if !current_node.is_leaf() {
             loop {
                 let mut retry = false;
@@ -160,28 +176,28 @@ impl<'a> Tokenizer<'a> {
                     match self.get_next_token(&mut paths_vec, chars) {
                         Ok(token_string) => {
                             match self.filter_nodes(&mut paths_vec, &token_string) {
-                                Some(path) => {
-                                    path.proke_travel_functions(self, &token_string);                                                   
-                                    for node in path.path.iter() {
-                                        match self.travel(node, chars) {
-                                            Ok(_) => (),
-                                            Err(depth) => {
-                                                if current_node.retry != depth {
-                                                    return Err(depth + 1)
-                                                } 
-                                                retry = true;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                _ => {
-                                    chars.go_back();
-                                    if !current_node.can_end {
-                                        return Err(0)
-                                    }
-                                }
-                            }
+                               Some(path) => {
+                                   path.proke_travel_functions(self, chars.get_msg());                                                   
+                                   for node in path.path.iter() {
+                                       match self.travel(node, chars) {
+                                           Ok(_) => (),
+                                           Err(depth) => {
+                                               if current_node.retry != depth {
+                                                   return Err(depth + 1)
+                                               } 
+                                               retry = true;
+                                               break;
+                                           }
+                                       }
+                                   }
+                               }
+                               _ => {
+                                   chars.go_back();
+                                   if !current_node.can_end {
+                                       return Err(0)
+                                   }
+                               }
+                           }
                         },
                         Err(_) => {
                             chars.go_back();
@@ -202,9 +218,9 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn get_next_token(&self, path_vec: &mut VecDeque<Path>, chars: &mut TextTraveler<'a>) -> Result<&'a str, String> {
-        let c = *chars.peek().unwrap();
+        let c = chars.peek().unwrap();
         if self.detect_char_token(path_vec, &c.to_string()) {
-            return Ok(chars.current_char()) 
+            return Ok(chars.str_next()) 
         }
         chars.mark();
         for (cond_stop, author_type) in self.identity_map.iter() {
@@ -213,7 +229,7 @@ impl<'a> Tokenizer<'a> {
                     self.next_char_while(chars, *cond_stop);
                     if chars.peek().is_some()
                         && *cond_stop == is_letter as fn(char)->bool
-                        && is_number(*chars.peek().unwrap())
+                        && is_number(chars.peek().unwrap())
                         && self.clean_son_vec(path_vec, &vec!(TokenType::Ident)) {  // If we are looking for an ident
                             self.next_char_while(chars, |c: char| {is_letter(c) || is_number(c)});
                     }
@@ -259,7 +275,7 @@ impl<'a> Tokenizer<'a> {
         chars.next();
         if continue_cond != is_sign as fn(char) -> bool {
             while let Some(c) = chars.peek() {
-                if continue_cond(*c) {    
+                if continue_cond(c) {    
                     chars.next();
                 }else{
                     break;
@@ -304,14 +320,14 @@ impl<'a> Tokenizer<'a> {
 
     fn skip_garbage(&self, chars: &mut TextTraveler) {
         while let Some(c) = chars.peek() {
-            if *c == COM_CHAR {
+            if c == COM_CHAR {
                 while chars.next() != Some('\n') && chars.peek() != None {}
             }else{
-                if !DEFAULT_GARBAGE_CHARACTER.contains(c) {                  
+                if !DEFAULT_GARBAGE_CHARACTER.contains(&c) {                  
                     break;
                 }
-                if *c == '\n' {
-                    push_token(self, TokenType::BackLine, "", Flag::NoFlag)
+                if c == '\n' {
+                    push_token(self, TokenType::BackLine, EMPTY_TOKEN, Flag::NoFlag)
                 }
                 chars.next();
             }
@@ -321,12 +337,8 @@ impl<'a> Tokenizer<'a> {
 }
 
 
-pub fn push_token(tk: &Tokenizer, token_type: TokenType, content: &str, flag: Flag) {
+pub fn push_token(tk: &Tokenizer, token_type: TokenType, content: ContentType, flag: Flag) {
     tk.sender.send(TokenizerMessage::Token(Token::new(token_type, content.clone(), flag))).expect("Error while sending new token");
-}
-
-pub fn end_request(tk: &Tokenizer, _token_type: TokenType, _content: &str, _flag: Flag) {
-    push_token(tk, TokenType::End, "", Flag::NoFlag)
 }
 
 fn is_sign(c: char) -> bool {

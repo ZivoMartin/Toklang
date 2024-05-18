@@ -1,15 +1,17 @@
 use crate::interpreteur::include::*;
 
 
-pub struct TPrimRulesSection;
+pub struct TPrimRulesSection<'a> {
+    text: &'a str
+}
 
 
-impl Section for TPrimRulesSection {
+impl<'a> Section<'a> for TPrimRulesSection<'a> {
 
-    fn new() -> Box<dyn Section> {
-        Box::from(TPrimRulesSection)
+    fn new(text: &'a str) -> Box<dyn Section<'a> + 'a> {
+        Box::from(TPrimRulesSection {text})
     }
 
-    fn new_token(&mut self, _token: Token) {}
+    fn new_token(&mut self, maps: &mut Maps, _token: Token) {}
     
 }

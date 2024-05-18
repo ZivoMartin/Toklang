@@ -1,10 +1,5 @@
-use super::tokenizer::Tokenizer;
+use super::tokenizer::{Tokenizer, push_token};
 
-use super::tokenizer::end_request;
-
-
-#[allow(dead_code)]
-#[allow(dead_code)]
 #[derive(Eq, Hash, PartialEq, Debug)]
 pub enum TokenType {
     // Primitive Token
@@ -31,9 +26,7 @@ pub enum TokenType {
     String,
     SerieChar,
     ComplexChar,
-    
-    
-    End,
+
     BackLine,
     ERROR,   
     
@@ -53,31 +46,26 @@ pub static OPERATORS: &[&'static str; 2] = &["||", "&&"];
 pub static OPERATOR_COMPONENT: &[char; 2] = &['|', '&'];
 pub static DEFAULT_GARBAGE_CHARACTER: &[char; 2] = &[' ', '\t'];
 static PRIMITIVE_TOKENTYPE: &[TokenType; 5] = &[TokenType::Ident, TokenType::Symbol, TokenType::Number, TokenType::Operator, TokenType::Keyword];
-pub static FAIL_MESSAGE: &str = "Syntax error";
+pub static PARSING_ERROR: &str = "Syntax error";
+pub type ContentType = (usize, usize);
+pub static EMPTY_TOKEN: ContentType = (0, 0);
 
-pub enum TokenizerMessage<'a> {
-
-    Token(Token<'a>),
+pub enum TokenizerMessage {
+    Token(Token),
     End()
-    
 }
 
 
 #[derive(Debug)]
-pub struct Token<'a> {
+pub struct Token {
     pub token_type: TokenType,
-    pub content: &'a str,
+    pub content: ContentType,
     pub flag: Flag 
 }
 
-impl<'a> Token<'a> {
-    pub fn new(token_type: TokenType, content: &'a str, flag: Flag) -> Token<'a> {
-        Token::<'a>{token_type, content, flag}
-    }
-
-    #[allow(dead_code)]
-    pub fn empty(token_type: TokenType) -> Token<'a> {
-        Token::<'a>::new(token_type, "", Flag::NoFlag)
+impl Token {
+    pub fn new(token_type: TokenType, content: ContentType, flag: Flag) -> Token {
+        Token{token_type, content, flag}
     }
     
 }
@@ -113,10 +101,10 @@ impl<'a> Path<'a> {
         self.path[0]
     }
 
-    pub fn proke_travel_functions(&self, tokenizer: &Tokenizer<'a>, token_string: &str) {
+    pub fn proke_travel_functions(&self, tokenizer: &Tokenizer, content: ContentType) {
         for node in self.path.iter().rev() {
             if node.travel_react.is_some() {
-                (node.travel_react.unwrap())(tokenizer, node.type_token, token_string, node.flag)
+                (node.travel_react.unwrap())(tokenizer, node.type_token, content, node.flag)
             }
         }
     } 
@@ -132,7 +120,7 @@ pub struct Node {
     pub constraints: (Vec::<&'static str>, bool),
     pub consider_garbage: bool,
     pub retry: i8,
-    pub travel_react: Option::<fn(&Tokenizer, TokenType, &str, Flag)>
+    pub travel_react: Option::<fn(&Tokenizer, TokenType, ContentType, Flag)>
 }
 
 
@@ -150,7 +138,7 @@ fn get_default_constraint(token_type: TokenType ) -> Vec<&'static str> {
     }
 }
 
-#[allow(dead_code)]
+
 impl Node {
 
     fn check_son(self) -> Node{
@@ -188,27 +176,6 @@ impl Node {
         Node::new_end_c(type_token, groups, sons, get_default_constraint(type_token))
     }
 
-    pub fn comma_leaf_c(type_token: TokenType, constraints: Vec<&'static str>) -> Node {
-        Node::new_c(
-            type_token,
-            vec!(),
-            vec!(
-                Node::leaf_c(TokenType::Symbol, vec!(";")).react(end_request)
-            ),
-            constraints
-        )
-    }
-
-    pub fn comma_leaf(type_token: TokenType) -> Node {
-        Node::new(
-            type_token,
-            vec!(),
-            vec!(
-                Node::leaf_c(TokenType::Symbol, vec!(";")).react(end_request)
-            ),
-        )
-    }
-
     pub fn new_c(type_token: TokenType, groups: Vec<Node>, sons: Vec<Node>, constraints: Vec<&'static str>) -> Node {
         Node{type_token, flag: Flag::NoFlag, groups, sons, can_end: false, constraints: (constraints, true), consider_garbage: false, retry: -1, travel_react: None}.check_son()
     }
@@ -235,11 +202,16 @@ impl Node {
         self.constraints.0.is_empty() || contains && self.constraints.1 || !contains && !self.constraints.1
     }
 
-    pub fn react(mut self, r: fn(&Tokenizer, TokenType, &str, Flag)) -> Node {
+    pub fn react(mut self, r: fn(&Tokenizer, TokenType, ContentType, Flag)) -> Node {
         self.travel_react = Some(r);
         self
     }
 
+    pub fn push(mut self) -> Node {
+        self.travel_react = Some(push_token);
+        self
+    }
+    
     pub fn consider_garbage(mut self) -> Node {
         self.consider_garbage = true;
         self

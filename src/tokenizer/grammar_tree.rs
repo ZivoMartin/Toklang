@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use super::include::{Node, TokenType, MACROS, SECTIONS, Flag};
-use super::tokenizer::push_token;
 
 pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
     let mut group_map = HashMap::new();
@@ -91,7 +90,7 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                     TokenType::Symbol,
                     vec!(),
                     vec!(
-                        Node::leaf_c(TokenType::Ident, Vec::from(SECTIONS)).set_flag(Flag::Section).react(push_token)
+                        Node::leaf_c(TokenType::Ident, Vec::from(SECTIONS)).set_flag(Flag::Section).push()
                     ),
                     vec!("#")
                 )
@@ -384,15 +383,15 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
             TokenType::ComplexChar,
             vec!(),
             vec!(
-                Node::leaf_c(TokenType::Symbol, vec!("\\", "\"", "\'")).priv_const(), // N'importe quoi sauf la contrainte
+                Node::leaf_c(TokenType::Symbol, vec!("\\", "\"", "\'")).priv_const().push(), // N'importe quoi sauf la contrainte
                 Node::new_c(
                     TokenType::Symbol,
                     vec!(),
                     vec!(
-                        Node::leaf(TokenType::Symbol)
+                        Node::leaf(TokenType::Symbol).push()
                     ),
                     vec!("\\")
-                )
+                ).push()
             )
         )
     );

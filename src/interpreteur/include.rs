@@ -3,13 +3,13 @@ pub type ConsumeResult = Result<(), String>;
 pub use std::collections::HashMap;
 pub use std::str::Chars;
 pub use std::iter::Peekable;
+pub use super::interpreteur::{Interpreteur, Maps};
 
+pub trait Section<'a> {
 
-pub trait Section {
-
-    fn new() -> Box::<dyn Section> where Self: Sized;
+    fn new(text: &'a str) -> Box::<dyn Section<'a> + 'a> where Self: Sized;
     
-    fn new_token(&mut self, token: Token);
+    fn new_token(&mut self, maps: &mut Maps, token: Token);
     
 }
 
@@ -23,7 +23,7 @@ pub enum Node<'a> {
     Leaf(TypeChar<'a>)
 }
 
-pub fn get_code(root: &str) -> &'static str {    
+pub fn get_code(_root: &str) -> &'static str {    
     "test"
 }
 
