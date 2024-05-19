@@ -26,10 +26,9 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                             ),
                             vec!(),
                             vec!("=")
-                        ),
-                     
+                        ).push()
                     )
-                ),
+                ).push(),
                 Node::new_c(
                     TokenType::Keyword,
                     vec!(),
@@ -41,10 +40,10 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                             ),
                             vec!(),
                             vec!("=")
-                        )
+                        ).push()
                     ),
                     vec!("SYMB", "TPRIM", "GROUPS")
-                )
+                ).push()
             )
         )
     );
@@ -131,7 +130,7 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                                 Node::leaf(TokenType::Expression)
                             ),
                             vec!()
-                        )
+                        ).push()
                     )
                 )
             ),
@@ -153,16 +152,16 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                                                 Node::leaf(TokenType::Expression)
                                             ),
                                             vec!()
-                                        )
+                                        ).push()
                                     ), 
                                     vec!(")") 
-                                )
+                                ).push()
                             )
                         )
                     ),
                     vec!(),
                     vec!("(")
-                )
+                ).push()
             )
         )
     );
@@ -195,7 +194,7 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                             vec!("{")
                         )
                     )
-                ),
+                ).push(),
             )
         )
     );

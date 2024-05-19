@@ -46,7 +46,7 @@ struct TextTraveler<'a> {
     base_i: usize,
     i: usize,
     chars: Peekable<Chars<'a>>,
-    text: &'a str
+    text: &'a str,
 }
 
 impl<'a> TextTraveler<'a> {
@@ -140,6 +140,7 @@ impl<'a> Tokenizer {
             if self.tokenize_one_line(line, base_i).is_err() {
                 break;
             }
+            push_token(self, TokenType::BackLine, EMPTY_TOKEN, Flag::NoFlag);
         }
         self.end();
     }
@@ -216,13 +217,13 @@ impl<'a> Tokenizer {
         }
         Ok(())
     }
-
+    
     fn get_next_token(&self, path_vec: &mut VecDeque<Path>, chars: &mut TextTraveler<'a>) -> Result<&'a str, String> {
         let c = chars.peek().unwrap();
-        if self.detect_char_token(path_vec, &c.to_string()) {
+        chars.mark();
+        if self.detect_char_token(path_vec, &c.to_string()) {            
             return Ok(chars.str_next()) 
         }
-        chars.mark();
         for (cond_stop, author_type) in self.identity_map.iter() {
             if cond_stop(c) {
                 if self.clean_son_vec(path_vec, author_type) {

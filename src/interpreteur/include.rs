@@ -3,15 +3,6 @@ pub type ConsumeResult = Result<(), String>;
 pub use std::collections::HashMap;
 pub use std::str::Chars;
 pub use std::iter::Peekable;
-pub use super::interpreteur::{Interpreteur, Maps};
-
-pub trait Section<'a> {
-
-    fn new(text: &'a str) -> Box::<dyn Section<'a> + 'a> where Self: Sized;
-    
-    fn new_token(&mut self, maps: &mut Maps, token: Token);
-    
-}
 
 
 type TypeChar<'a> = &'a str;
