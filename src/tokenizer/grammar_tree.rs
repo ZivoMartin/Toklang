@@ -26,9 +26,9 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                             ),
                             vec!(),
                             vec!("=")
-                        ).push()
+                        )
                     )
-                ).push(),
+                ),
                 Node::new_c(
                     TokenType::Keyword,
                     vec!(),
@@ -40,10 +40,10 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                             ),
                             vec!(),
                             vec!("=")
-                        ).push()
+                        )
                     ),
-                    vec!("SYMB", "TPRIM", "GROUPS")
-                ).push()
+                    vec!("CHARS", "TPRIMS", "GROUPS")
+                )
             )
         )
     );
@@ -89,7 +89,7 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                     TokenType::Symbol,
                     vec!(),
                     vec!(
-                        Node::leaf_c(TokenType::Ident, Vec::from(SECTIONS)).set_flag(Flag::Section).push()
+                        Node::leaf_c(TokenType::Ident, Vec::from(SECTIONS)).set_flag(Flag::Section)
                     ),
                     vec!("#")
                 )
@@ -130,7 +130,7 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                                 Node::leaf(TokenType::Expression)
                             ),
                             vec!()
-                        ).push()
+                        )
                     )
                 )
             ),
@@ -152,16 +152,16 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                                                 Node::leaf(TokenType::Expression)
                                             ),
                                             vec!()
-                                        ).push()
+                                        )
                                     ), 
                                     vec!(")") 
-                                ).push()
+                                )
                             )
                         )
                     ),
                     vec!(),
                     vec!("(")
-                ).push()
+                )
             )
         )
     );
@@ -194,7 +194,7 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
                             vec!("{")
                         )
                     )
-                ).push(),
+                ),
             )
         )
     );
@@ -382,15 +382,15 @@ pub fn build_grammar_tree() -> HashMap<TokenType, Node> {
             TokenType::ComplexChar,
             vec!(),
             vec!(
-                Node::leaf_c(TokenType::Symbol, vec!("\\", "\"", "\'")).priv_const().push(), // N'importe quoi sauf la contrainte
+                Node::leaf_c(TokenType::Symbol, vec!("\\", "\"", "\'")).priv_const(), // N'importe quoi sauf la contrainte
                 Node::new_c(
                     TokenType::Symbol,
                     vec!(),
                     vec!(
-                        Node::leaf(TokenType::Symbol).push()
+                        Node::leaf(TokenType::Symbol)
                     ),
                     vec!("\\")
-                ).push()
+                )
             )
         )
     );

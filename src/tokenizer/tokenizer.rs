@@ -140,7 +140,7 @@ impl<'a> Tokenizer {
             if self.tokenize_one_line(line, base_i).is_err() {
                 break;
             }
-            push_token(self, TokenType::BackLine, EMPTY_TOKEN, Flag::NoFlag);
+            push_token(self, TokenType::Line, (base_i, chars.i), Flag::NoFlag);
         }
         self.end();
     }

@@ -39,8 +39,8 @@ pub enum Flag {
     NoFlag
 }
 
-pub static KEYWORDS: &[&'static str; 5] = &["GROUPS", "TPRIM", "SYMB", "in", "END"];
-pub static SECTIONS: &[&'static str; 4] = &["DEFINE", "CHAR_RULES", "TPRIM_RULES", "GROUP_RULES"];
+pub static KEYWORDS: &[&'static str; 5] = &["GROUPS", "TPRIMS", "CHARS", "in", "END"];
+pub static SECTIONS: &[&'static str; 4] = &["DECLARE", "CHAR_RULES", "TPRIM_RULES", "GROUP_RULES"];
 pub static MACROS: &[&'static str; 3] = &["DIGITS", "LETTERS", "OTHER"];
 pub static OPERATORS: &[&'static str; 2] = &["||", "&&"];
 pub static OPERATOR_COMPONENT: &[char; 2] = &['|', '&'];
