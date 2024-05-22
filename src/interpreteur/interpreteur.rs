@@ -1,93 +1,12 @@
 use super::include::*;
 
-type TypeChar<'a> = &'a str;
-type TokenForest<'a> = Vec::<TokenNode<'a>>;
-
-fn merge_forests<'a>(f1: &mut TokenForest<'a>, f2: &mut TokenForest<'a>) {
-    for node_f2 in f2.iter_mut() {
-        let mut push_it = true;
-        for node_f1 in f1.iter_mut() {
-            if node_f1.typechar() == node_f2.typechar() {
-                push_it = false;
-                node_f1.merge(node_f2);
-                break
-            }
-        }
-        if push_it {
-            f1.push(node_f2.clone());
-        }
-    }
-}
-
-struct TokenIdentity<'a> {
-    forest: TokenForest<'a>,
-    constraints: Vec::<&'a str>
-}
-
-impl<'a> TokenIdentity<'a> {
-
-    fn new() -> TokenIdentity<'a> {
-        TokenIdentity {
-            forest: TokenForest::new(),
-            constraints: Vec::new()
-        }
-    }
-
-    fn set_constraints(&mut self, constraints: Vec::<&'a str>) {
-        self.constraints = constraints;
-    }
-    
-    fn set_forest(&mut self, forest: TokenForest<'a>) {
-        self.forest = forest;
-    }
-    
-}
-
-#[derive(Debug)]
-#[derive(Clone)]
-pub enum TokenNode<'a> {
-    Node(TypeChar<'a>, bool, TokenForest<'a>),
-    Leaf(TypeChar<'a>)
-}
-
-
-impl<'a> TokenNode<'a> {
-
-    fn typechar(&self) -> TypeChar<'a> {
-        match self {
-            TokenNode::Node(tc, _, _) => tc,
-            TokenNode::Leaf(tc) => tc
-        }
-    }
-
-    fn merge(&mut self, node: &mut TokenNode<'a>) {
-        match self {
-            TokenNode::Node(_, can_end, forest) => {
-                match node {
-                    TokenNode::Leaf(_) => *can_end = true,
-                    TokenNode::Node(_, _, new_forest) => merge_forests(forest, new_forest)
-                }
-            },
-            TokenNode::Leaf(_) => {
-                match node {
-                    TokenNode::Node(root, _, forest) => *self = TokenNode::Node(root, true, forest.to_vec()),
-                    TokenNode::Leaf(_) => ()
-                }
-            }
-        }
-    }
-    
-}
-
-
-
 type Consumer<'a> = fn(&mut Interpreteur<'a>, &'a str, &'a str, &'a str, TokenType) -> ConsumeResult;
 
 pub struct Interpreteur<'a> {
     text: &'a str,
     symb_types: HashMap<&'a str, &'a str>,
-    token_types: HashMap<&'a str, TokenIdentity<'a>>,
-    group_types: HashMap<&'a str, &'a str>,
+    token_types: HashMap<&'a str, Identity<'a>>,
+    group_types: HashMap<&'a str, Identity<'a>>,
     current_section: &'a str,
     sections: HashMap<&'a str, Consumer<'a>>,
 }
@@ -147,12 +66,14 @@ impl<'a> Interpreteur<'a> {
             }
             "TPRIMS" => {
                 for name in right.split(",") {
-                    self.token_types.insert(name.trim(), TokenIdentity::new());
+                    let name = name.trim();
+                    self.token_types.insert(name, Identity::token(name));
                 }
             }
             "GROUPS" => {
                 for name in right.split(",") {
-                    self.group_types.insert(name.trim(), "");
+                    let name = name.trim();
+                    self.group_types.insert(name, Identity::group(name));
                 }
             }
             _ => return Err(format!("You can't define '{left}'"))
@@ -167,7 +88,7 @@ impl<'a> Interpreteur<'a> {
         match op {
             "=" =>{
                 let forest = self.ptoken_building_tree(left, right)?;
-                self.token_types.get_mut(left).unwrap().set_forest(forest)
+                self.token_types.get_mut(left).unwrap().set_forest(forest)?
             },
             "in" => {
                 let mut constraints = Vec::new();
@@ -175,7 +96,7 @@ impl<'a> Interpreteur<'a> {
                     let constraint = constraint.trim();
                     constraints.push(&constraint[1..constraint.len()-1]);
                 }
-                self.token_types.get_mut(left).unwrap().set_constraints(constraints);
+                self.token_types.get_mut(left).unwrap().set_constraints(constraints)?;
             },
             _ => return Err(format!("This operator isn't authorized here: {op}"))
          };
@@ -183,6 +104,11 @@ impl<'a> Interpreteur<'a> {
     }
 
     fn group_rules_token(&mut self,  left: &'a str, op: &'a str, right: &'a str, token_type: TokenType) -> ConsumeResult {
+        if !self.group_types.contains_key(left) {
+            return Err(format!("The group token {left} doesn't exists."))
+        }
+        let forest = self.ptoken_building_tree(left, right)?;
+        self.group_types.get_mut(left).unwrap().set_forest(forest)?;
         Ok(())
     }
     
@@ -204,16 +130,12 @@ impl<'a> Interpreteur<'a> {
         res
     }
 
-    fn extract_root(&self, mut root: &'a str, name: &'a str) -> Result<(&'a str, bool, Vec::<&'a str>), String> {
+    fn extract_root(&self, mut root: &'a str) -> (&'a str, bool, Vec::<&'a str>) {
         let mut is_end = false;
         let mut constraints = Vec::<&'a str>::new();
-        let is_self = root == name;
         let mut split = root.split("{");
         root = split.next().unwrap().trim();
         if let Some(args) = split.next() {
-            if name == root {
-                return Err(format!("You can't pass an argument to {name}"))
-            }
             let args = &args[0..args.len()-1];
             let mut j = 0;
             let mut comma = false;
@@ -227,11 +149,7 @@ impl<'a> Interpreteur<'a> {
             }
             (is_end, constraints) = self.match_node_arg(&args[j..], constraints, is_end)
         }
-        if !is_self && !self.symb_types.contains_key(root) {
-            Err(format!("The symbol {root} doesn't exists")) 
-        } else {
-            Ok((root, is_end, constraints))
-        }
+        (root, is_end, constraints)
     }
 
     fn match_node_arg(&self, mut arg: &'a str,
@@ -246,20 +164,20 @@ impl<'a> Interpreteur<'a> {
         (is_end, constraints)
     }
     
-    fn ptoken_building_tree(&self, name: &'a str, mut expr: &'a str) -> Result<TokenForest<'a>, String> {
+    fn ptoken_building_tree(&self, name: &'a str, mut expr: &'a str) -> Result<Forest<'a>, String> {
         expr = expr.trim();
         let mut iter = expr.chars().peekable();
-        let mut forest = TokenForest::new();
+        let mut forest = Forest::new();
         while iter.peek().is_some() {
             let sub_expr: &str;
             (sub_expr, expr) = self.get_next_expr(expr, &mut iter, '|');
             let (root, mut rest) = self.get_next_expr(sub_expr, &mut sub_expr.chars().peekable(), '&');
             rest = rest.trim();
-            let (root, is_end, node_constraints) = self.extract_root(root, name)?;
+            let (root, is_end, node_constraints) = self.extract_root(root);
             let mut new_node = if rest.is_empty() {
-                TokenNode::Leaf(root)
+                Node::Leaf(root)
             } else {
-                TokenNode::Node(root, is_end, self.ptoken_building_tree(name, rest)?)
+                Node::Node(root, is_end, self.ptoken_building_tree(name, rest)?)
             };
             let mut push_it = true;
             for node in forest.iter_mut() {
@@ -300,7 +218,6 @@ impl<'a> Interpreteur<'a> {
             }
             res += 1;
         }
-        // res = res.trim().to_string();    
         if first == '(' && c == ')' {
             expr = &expr[1..(res-1)];
             *iter = expr.chars().peekable();
